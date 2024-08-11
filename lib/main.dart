@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:tracer_app/features/maps/presentation/full_map_view.dart';
+import 'package:tracer_app/features/maps/presentation/widgets/map_widget.dart';
 
 import 'package:tracer_app/firebase_options.dart';
 
@@ -19,6 +20,9 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(home: FullMapView());
+    return const MaterialApp(
+        home: Scaffold(
+      body: FullMapView(),
+    ));
   }
 }

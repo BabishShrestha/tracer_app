@@ -22,10 +22,10 @@ class MapsViewState extends ConsumerState<MapsView> {
   final Completer<GoogleMapController> _controller =
       Completer<GoogleMapController>();
 
-  static const CameraPosition _kGooglePlex = CameraPosition(
-    target: LatLng(27.7172, 85.3240),
-    zoom: 14.4746,
-  );
+  // static const CameraPosition _kGooglePlex = CameraPosition(
+  //   target: LatLng(27.7172, 85.3240),
+  //   zoom: 14.4746,
+  // );
 // 27.7172° N, 85.3240° E
 
   @override
@@ -49,8 +49,8 @@ class MapsViewState extends ConsumerState<MapsView> {
                 Marker(
                   markerId: const MarkerId('1'),
                   position: LatLng(
-                    snapshot.data!.latitude ?? 27.7172,
-                    snapshot.data!.longitude ?? 85.3240,
+                    snapshot.data?.latitude ?? 27.7172,
+                    snapshot.data?.longitude ?? 85.3240,
                   ),
                   icon: BitmapDescriptor.defaultMarker,
                 ),
@@ -62,7 +62,13 @@ class MapsViewState extends ConsumerState<MapsView> {
               },
               mapType: MapType.normal,
               rotateGesturesEnabled: true,
-              initialCameraPosition: _kGooglePlex,
+              initialCameraPosition: CameraPosition(
+                target: LatLng(
+                  snapshot.data?.latitude ?? 27.7172,
+                  snapshot.data?.longitude ?? 85.3240,
+                ),
+                zoom: 14.4746,
+              ),
               onMapCreated: (GoogleMapController controller) {
                 _controller.complete(controller);
               },
@@ -93,25 +99,25 @@ class MapsViewState extends ConsumerState<MapsView> {
     return BitmapDescriptor.bytes(imageData);
   }
 
-  Future<Set<Marker>> generateStaffMarkers(List<LatLng> positions) async {
-    List<Marker> markers = <Marker>[];
+  // Future<Set<Marker>> generateStaffMarkers(List<LatLng> positions) async {
+  //   List<Marker> markers = <Marker>[];
 
-    for (final location in positions) {
-      // final icon =
-      //     await getBitmapDescriptorFromAssetBytes(UIImagePath.vendorTeam, 100);
+  //   for (final location in positions) {
+  //     // final icon =
+  //     //     await getBitmapDescriptorFromAssetBytes(UIImagePath.vendorTeam, 100);
 
-      final marker = Marker(
-        markerId: MarkerId(location.toString()),
-        position: LatLng(location.latitude, location.longitude),
-        infoWindow: const InfoWindow(title: "Staff", snippet: "Vendor Team"),
-        // icon: icon,
-      );
+  //     final marker = Marker(
+  //       markerId: MarkerId(location.toString()),
+  //       position: LatLng(location.latitude, location.longitude),
+  //       infoWindow: const InfoWindow(title: "Staff", snippet: "Vendor Team"),
+  //       // icon: icon,
+  //     );
 
-      markers.add(marker);
-    }
+  //     markers.add(marker);
+  //   }
 
-    return markers.toSet();
-  }
+  //   return markers.toSet();
+  // }
 
   // GoogleMap _buildGoogleMap(Set<Marker> markers) {
   //   return GoogleMap(
