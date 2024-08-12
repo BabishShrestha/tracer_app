@@ -1,15 +1,16 @@
 import 'dart:async';
 import 'dart:developer';
-import 'dart:ui' as ui;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:tracer_app/features/user/domain/app_user.dart';
+import 'package:tracer_app/core/utils/constants.dart';
+
+import '../../domain/user_location.dart';
 
 class MapsView extends ConsumerStatefulWidget {
   const MapsView({super.key});
@@ -19,121 +20,153 @@ class MapsView extends ConsumerStatefulWidget {
 }
 
 class MapsViewState extends ConsumerState<MapsView> {
-  final Completer<GoogleMapController> _controller =
-      Completer<GoogleMapController>();
+  late Completer<GoogleMapController> _controller;
 
-  // static const CameraPosition _kGooglePlex = CameraPosition(
-  //   target: LatLng(27.7172, 85.3240),
-  //   zoom: 14.4746,
-  // );
-// 27.7172° N, 85.3240° E
+  Map<PolylineId, Polyline> polylines = {};
+
+  Future<void> cameraMove(LatLng latLng) async {
+    final GoogleMapController controller = await _controller.future;
+    await controller.animateCamera(CameraUpdate.newCameraPosition(
+      CameraPosition(
+        target: latLng,
+        zoom: 14.4746,
+      ),
+    ));
+  }
+
+  Future<List<LatLng>> getPolyLinePoints(
+      LatLng origin, LatLng destination) async {
+    List<LatLng> polyLineCoordinates = [];
+    PolylinePoints polylinePoints = PolylinePoints();
+    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+        googleApiKey: GOOGLE_MAPS_API_KEY,
+        request: PolylineRequest(
+          origin: PointLatLng(origin.latitude, origin.longitude),
+          destination: PointLatLng(destination.latitude, destination.longitude),
+          mode: TravelMode.driving,
+        ));
+    if (result.points.isNotEmpty) {
+      for (var point in result.points) {
+        polyLineCoordinates.add(LatLng(point.latitude, point.longitude));
+      }
+    } else {
+      log(result.errorMessage.toString());
+    }
+    return polyLineCoordinates;
+  }
+
+  void generatePolyLinesFromPoints(List<LatLng> polyLineCoordinates) {
+    const PolylineId polylineId = PolylineId('poly');
+    final Polyline polyline = Polyline(
+      polylineId: polylineId,
+      color: Colors.grey,
+      points: polyLineCoordinates,
+      width: 8,
+    );
+    // setState(() {
+    polylines[polylineId] = polyline;
+    // });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = Completer<GoogleMapController>();
+  }
+
+  @override
+  void dispose() {
+    _controller.future.then((controller) => controller.dispose());
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: StreamBuilder<AppUser>(
-          stream: FirebaseFirestore.instance
-              .collection('Users')
-              .snapshots()
-              .map((event) => AppUser.fromJson(event.docs.first.data())),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
-            }
+    return StreamBuilder<List<UserLocation>>(
+        stream: FirebaseFirestore.instance
+            .collectionGroup('Location')
+            .orderBy('timestamp', descending: false)
+            .snapshots()
+            .map((event) => event.docs
+                .map((e) => UserLocation.fromJson(e.data()))
+                .toList()),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            log(snapshot.error.toString());
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+          final locations = snapshot.data ?? [];
+          UserLocation? currentPosition;
+          if (locations.isNotEmpty) {
+            final firstLocation = locations.first;
+            currentPosition = firstLocation;
+            getPolyLinePoints(
+                    LatLng(
+                        locations.first.latitude!, locations.first.longitude!),
+                    LatLng(locations.last.latitude!, locations.last.longitude!))
+                .then(
+                    (coordinates) => generatePolyLinesFromPoints(coordinates));
+          }
 
-            return GoogleMap(
-              myLocationEnabled: true,
-              markers: {
-                Marker(
-                  markerId: const MarkerId('1'),
-                  position: LatLng(
-                    snapshot.data?.latitude ?? 27.7172,
-                    snapshot.data?.longitude ?? 85.3240,
-                  ),
-                  icon: BitmapDescriptor.defaultMarker,
+          return _buildMap(currentPosition);
+        });
+  }
+
+  Future<Set<Marker>> generateMarkers(List<UserLocation> positions) async {
+    List<Marker> markers = <Marker>[];
+
+    for (final location in positions) {
+      const icon = BitmapDescriptor.defaultMarker;
+
+      final marker = Marker(
+        markerId: MarkerId(location.toString()),
+        position: LatLng(location.latitude!, location.longitude!),
+        icon: icon,
+      );
+
+      markers.add(marker);
+    }
+
+    return markers.toSet();
+  }
+
+  _buildMap(UserLocation? currentLocation) {
+    return GoogleMap(
+      markers: currentLocation != null
+          ? {
+              Marker(
+                markerId: const MarkerId('current'),
+                position: LatLng(
+                  currentLocation.latitude!,
+                  currentLocation.longitude!,
                 ),
-              },
-              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                Factory<OneSequenceGestureRecognizer>(
-                  () => EagerGestureRecognizer(),
-                ),
-              },
-              mapType: MapType.normal,
-              rotateGesturesEnabled: true,
-              initialCameraPosition: CameraPosition(
-                target: LatLng(
-                  snapshot.data?.latitude ?? 27.7172,
-                  snapshot.data?.longitude ?? 85.3240,
-                ),
-                zoom: 14.4746,
-              ),
-              onMapCreated: (GoogleMapController controller) {
-                _controller.complete(controller);
-              },
-            );
-          }),
+                icon: BitmapDescriptor.defaultMarker,
+              )
+            }
+          : {},
+      gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+        Factory<OneSequenceGestureRecognizer>(
+          () => EagerGestureRecognizer(),
+        ),
+      },
+      polylines: Set<Polyline>.of(polylines.values),
+      mapType: MapType.normal,
+      rotateGesturesEnabled: true,
+      initialCameraPosition: CameraPosition(
+        target: LatLng(
+          currentLocation?.latitude ?? 27.7172,
+          currentLocation?.longitude ?? 85.3240,
+        ),
+        zoom: 14.4746,
+      ),
+      onMapCreated: (GoogleMapController controller) async {
+        if (!_controller.isCompleted) {
+          _controller.complete(controller);
+        }
+      },
     );
   }
-
-  Future<Uint8List> getBytesFromAsset(String path, int width) async {
-    try {
-      ByteData data = await rootBundle.load(path);
-      ui.Codec codec = await ui.instantiateImageCodec(data.buffer.asUint8List(),
-          targetWidth: width);
-      ui.FrameInfo fi = await codec.getNextFrame();
-      return (await fi.image.toByteData(format: ui.ImageByteFormat.png))!
-          .buffer
-          .asUint8List();
-    } catch (e) {
-      log('Error loading asset: $e');
-      // Provide fallback bytes or handle the error as needed.
-      return Uint8List(0);
-    }
-  }
-
-  Future<BitmapDescriptor> getBitmapDescriptorFromAssetBytes(
-      String path, int width) async {
-    final Uint8List imageData = await getBytesFromAsset(path, width);
-    return BitmapDescriptor.bytes(imageData);
-  }
-
-  // Future<Set<Marker>> generateStaffMarkers(List<LatLng> positions) async {
-  //   List<Marker> markers = <Marker>[];
-
-  //   for (final location in positions) {
-  //     // final icon =
-  //     //     await getBitmapDescriptorFromAssetBytes(UIImagePath.vendorTeam, 100);
-
-  //     final marker = Marker(
-  //       markerId: MarkerId(location.toString()),
-  //       position: LatLng(location.latitude, location.longitude),
-  //       infoWindow: const InfoWindow(title: "Staff", snippet: "Vendor Team"),
-  //       // icon: icon,
-  //     );
-
-  //     markers.add(marker);
-  //   }
-
-  //   return markers.toSet();
-  // }
-
-  // GoogleMap _buildGoogleMap(Set<Marker> markers) {
-  //   return GoogleMap(
-  //     myLocationEnabled: true,
-  //     markers: markers,
-  //     gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-  //       Factory<OneSequenceGestureRecognizer>(
-  //         () => EagerGestureRecognizer(),
-  //       ),
-  //     },
-  //     mapType: MapType.normal,
-  //     rotateGesturesEnabled: true,
-  //     initialCameraPosition: _kGooglePlex,
-  //     onMapCreated: (GoogleMapController controller) {
-  //       _controller.complete(controller);
-  //     },
-  //   );
-  // }
 }

@@ -9,7 +9,7 @@ class FullMapView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Map'),
+        title: const Text('Tracer Map'),
       ),
       body: const Stack(
         children: [
@@ -17,7 +17,7 @@ class FullMapView extends StatelessWidget {
           Positioned(
             bottom: 90,
             left: 23,
-            child: Opacity(opacity: 0.8, child: LegendWidget()),
+            child: Opacity(opacity: 0, child: LegendWidget()),
           )
         ],
       ),
