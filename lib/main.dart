@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tracer_app/features/maps/presentation/full_map_view.dart';
 import 'package:tracer_app/features/maps/presentation/widgets/map_widget.dart';
-
+import 'package:tracer_app/features/push_noitification/push_notification_service.dart';
 import 'package:tracer_app/firebase_options.dart';
 
 Future<void> main() async {
@@ -12,6 +12,7 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await PushNotificationService().initialize();
 
   runApp(const ProviderScope(child: MainApp()));
 }

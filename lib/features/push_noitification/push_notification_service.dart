@@ -4,11 +4,6 @@ import 'dart:developer';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:placemyorder/src/core/routes/app_router.dart';
-import 'package:placemyorder/src/features/authentication/data/auth_repo.dart';
-import 'package:placemyorder/src/features/dashboard/wrapper.dart';
 
 @pragma('vm:entry-point')
 Future<void> handleBackgroundMessage(RemoteMessage? message) async {
@@ -40,21 +35,21 @@ class PushNotificationService {
     log('Body: ${message.notification?.body}');
     log('Payload: ${message.data}');
 
-    final goRouter =
-        GoRouter.of(NavigationService.navigatorKey.currentContext!);
+    // final goRouter =
+    //     GoRouter.of(NavigationService.navigatorKey.currentContext!);
 
-    bool currentRouteIsViewOrderHistory =
-        goRouter.routeInformationProvider.value.uri.toString() ==
-            '/${RoutePath.viewOrderHistory}';
-    final ref = ProviderContainer();
-    final isLoggedIn = await ref.read(authProvider).isAuthenticated();
-    log(' Push notify Is Logged In: $isLoggedIn');
+    // bool currentRouteIsViewOrderHistory =
+    //     goRouter.routeInformationProvider.value.uri.toString() ==
+    //         '/${RoutePath.viewOrderHistory}';
+    // final ref = ProviderContainer();
+    // final isLoggedIn = await ref.read(authProvider).isAuthenticated();
+    // log(' Push notify Is Logged In: $isLoggedIn');
     // ? direct to page when notification is pressed
-    if (!currentRouteIsViewOrderHistory && isLoggedIn) {
-      goRouter.replace('/wrapper', extra: NavBarIndex.orderHistory.index);
-    } else {
-      goRouter.go('/');
-    }
+    // if (!currentRouteIsViewOrderHistory && isLoggedIn) {
+    //   // goRouter.replace('/wrapper', extra: NavBarIndex.orderHistory.index);
+    // } else {
+    //   goRouter.go('/');
+    // }
   }
 
   Future<void> initialize() async {
@@ -63,14 +58,15 @@ class PushNotificationService {
     if (kDebugMode) {
       log('Permission granted: ${settings.authorizationStatus}');
     }
-    await getToken();
+    await _fcm.subscribeToTopic('tracer');
+
     initLocalNotifications();
     initPushNotifications();
   }
 
   Future<void> initLocalNotifications() async {
     const iOS = DarwinInitializationSettings();
-    const android = AndroidInitializationSettings('@mipmap/launcher_icon');
+    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const settings = InitializationSettings(android: android, iOS: iOS);
 
     await _localNotification.initialize(settings,

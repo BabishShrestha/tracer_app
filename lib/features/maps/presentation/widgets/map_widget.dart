@@ -101,8 +101,9 @@ class MapsViewState extends ConsumerState<MapsView> {
           final locations = snapshot.data ?? [];
           UserLocation? currentPosition;
           if (locations.isNotEmpty) {
-            final firstLocation = locations.first;
-            currentPosition = firstLocation;
+            for (var location in locations) {
+              currentPosition = location;
+            }
             getPolyLinePoints(
                     LatLng(
                         locations.first.latitude!, locations.first.longitude!),
@@ -110,8 +111,11 @@ class MapsViewState extends ConsumerState<MapsView> {
                 .then(
                     (coordinates) => generatePolyLinesFromPoints(coordinates));
           }
-
-          return _buildMap(currentPosition);
+          currentPosition != null
+              ? cameraMove(
+                  LatLng(currentPosition.latitude!, currentPosition.longitude!))
+              : null;
+          return _buildMap(locations.first, currentPosition, locations.last);
         });
   }
 
@@ -133,12 +137,29 @@ class MapsViewState extends ConsumerState<MapsView> {
     return markers.toSet();
   }
 
-  _buildMap(UserLocation? currentLocation) {
+  _buildMap(UserLocation initialLocation, UserLocation? currentLocation,
+      UserLocation lastLocation) {
     return GoogleMap(
       markers: currentLocation != null
           ? {
               Marker(
+                markerId: const MarkerId('initial'),
+                position: LatLng(
+                  currentLocation.latitude!,
+                  currentLocation.longitude!,
+                ),
+                icon: BitmapDescriptor.defaultMarker,
+              ),
+              Marker(
                 markerId: const MarkerId('current'),
+                position: LatLng(
+                  currentLocation.latitude!,
+                  currentLocation.longitude!,
+                ),
+                icon: BitmapDescriptor.defaultMarker,
+              ),
+              Marker(
+                markerId: const MarkerId('last'),
                 position: LatLng(
                   currentLocation.latitude!,
                   currentLocation.longitude!,
